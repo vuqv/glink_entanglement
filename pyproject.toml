@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "glink-entanglement"
+version = "0.1.0"
+description = "Gaussian-linking entanglement detection and clustering for protein structures"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Quyen Vu" }
+]
+dependencies = [
+    "MDAnalysis",
+    "numpy",
+    "pandas",
+    "scipy",
+    "topoly",
+]
+
+[project.scripts]
+glink = "glink_entanglement.glink:main"
+glink-cluster = "glink_entanglement.clustering:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["glink_entanglement*"]

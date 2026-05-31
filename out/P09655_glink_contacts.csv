@@ -1,0 +1,4 @@
+chain,resid_i,resname_i,resid_j,resname_j,contact_i_index,contact_j_index,gn,gc,Gn,Gc,crossingsN,crossingsC,crossings
+A,52,ILE,79,CYS,51,78,-0.6431801319122314,0.0,1,0,-45,,-45
+A,53,THR,78,THR,52,77,-0.7075268030166626,0.0,1,0,-45,,-45
+A,53,THR,79,CYS,52,78,-0.6922792196273804,0.0,1,0,-45,,-45

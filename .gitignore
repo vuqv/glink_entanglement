@@ -1,0 +1,27 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+env/
+venv/
+.venv/
+
+# Pytest cache
+.pytest_cache/
+
+# MyPy
+.mypy_cache/
+
+# IDE/editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Local Python environment
+.python-version

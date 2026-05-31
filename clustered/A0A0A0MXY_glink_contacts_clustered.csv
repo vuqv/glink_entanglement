@@ -1,0 +1,2 @@
+cluster_id,chain,resid_i,resid_j,gn,gc,Gn,Gc,crossings,num_contacts,contacts
+0,A,84,165,0.1305,0.60836,0,1,+172,1,84-165

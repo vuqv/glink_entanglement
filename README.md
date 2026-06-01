@@ -111,7 +111,7 @@ Examples:
 - `Gn != 0`, `Gc != 0`: keep if Topoly finds `crossingsN` or `crossingsC`.
 - no relevant Topoly crossings: drop the contact.
 
-Topoly loop indices are passed as 1-based indices. Topoly crossing indices are mapped back to PDB residue IDs.
+Topoly accepts 1-based coordinate-array indices. `glink` stores contact indices as zero-based C-alpha indices in the CSV columns `i` and `j`, adds `1` before passing loop indices to Topoly, and treats Topoly crossing labels as 1-based indices when mapping them back to PDB residue IDs.
 
 ### Command
 
@@ -177,19 +177,15 @@ CSV columns:
 
 | Column | Description |
 | --- | --- |
-| `chain` | Chain/segment identifier. |
-| `resid_i` | PDB residue ID for the first contact residue. |
-| `resname_i` | Residue name for `resid_i`. |
-| `resid_j` | PDB residue ID for the second contact residue. |
-| `resname_j` | Residue name for `resid_j`. |
-| `contact_i_index` | Zero-based C-alpha index for the first contact residue. |
-| `contact_j_index` | Zero-based C-alpha index for the second contact residue. |
-| `gn` | Raw N-terminal partial Gaussian linking value. |
-| `gc` | Raw C-terminal partial Gaussian linking value. |
+| `contact` | Contact label formatted as `<resname_i><resid_i>-<resname_j><resid_j>`, for example `ILE17-THR194`. |
+| `i` | Zero-based C-alpha index for the first contact residue. |
+| `j` | Zero-based C-alpha index for the second contact residue. |
+| `gn` | N-terminal partial Gaussian linking value, printed to three decimals. |
+| `gc` | C-terminal partial Gaussian linking value, printed to three decimals. |
 | `Gn` | Rounded absolute `gn`. |
 | `Gc` | Rounded absolute `gc`. |
-| `crossingsN` | Topoly N-terminal crossing residues mapped to PDB residue IDs. |
-| `crossingsC` | Topoly C-terminal crossing residues mapped to PDB residue IDs. |
+| `crossingsN` | Topoly N-terminal crossing residues. Topoly reports 1-based crossing indices; the CSV values are mapped to PDB residue IDs. |
+| `crossingsC` | Topoly C-terminal crossing residues. Topoly reports 1-based crossing indices; the CSV values are mapped to PDB residue IDs. |
 | `crossings` | Combined crossing residues used by clustering. |
 
 The script prints total runtime:
@@ -256,7 +252,7 @@ Using an organism preset:
 
 ```bash
 glink-cluster \
-  -r 2ww4_glink_contacts.csv \
+  -f 2ww4_glink_contacts.csv \
   -o clustered_glink \
   -g Human
 ```
@@ -265,7 +261,7 @@ Using a custom cutoff:
 
 ```bash
 glink-cluster \
-  -r 2ww4_glink_contacts.csv \
+  -f 2ww4_glink_contacts.csv \
   -o clustered_glink \
   -c 52
 ```
@@ -274,7 +270,7 @@ Writing to an explicit output file:
 
 ```bash
 glink-cluster \
-  -r 2ww4_glink_contacts.csv \
+  -f 2ww4_glink_contacts.csv \
   -o clustered_glink \
   -g Human \
   -w clustered_glink/2ww4_representative_entanglements.csv
@@ -284,7 +280,7 @@ glink-cluster \
 
 | Short | Long | Description |
 | --- | --- | --- |
-| `-r` | `--glink_csv` | Raw entanglement CSV from `glink`. |
+| `-f` | `--glink_csv` | Raw entanglement CSV from `glink`. |
 | `-o` | `--outpath` | Output directory. |
 | `-g` | `--organism` | Organism preset: `Human`, `Ecoli`, or `Yeast`. |
 | `-c` | `--cutoff` | Custom spatial clustering cutoff. |
@@ -303,16 +299,16 @@ CSV columns:
 | Column | Description |
 | --- | --- |
 | `cluster_id` | Integer representative cluster ID. |
-| `chain` | Chain/segment identifier. |
-| `resid_i` | Representative loop start residue ID. |
-| `resid_j` | Representative loop end residue ID. |
-| `gn` | Raw `gn` value from the representative contact. |
-| `gc` | Raw `gc` value from the representative contact. |
+| `contact` | Representative contact label formatted as `<resname_i><resid_i>-<resname_j><resid_j>`. |
+| `i` | Zero-based C-alpha index for the representative contact's first residue. |
+| `j` | Zero-based C-alpha index for the representative contact's second residue. |
+| `gn` | `gn` value from the representative contact, printed to three decimals. |
+| `gc` | `gc` value from the representative contact, printed to three decimals. |
 | `Gn` | Rounded absolute `gn` from the representative contact. |
 | `Gc` | Rounded absolute `gc` from the representative contact. |
 | `crossings` | Representative crossing residue set. |
 | `num_contacts` | Number of raw contacts represented by the cluster. |
-| `contacts` | Semicolon-delimited raw contact list, formatted as `i-j`. |
+| `contacts` | Semicolon-delimited raw contact list, formatted like `ILE17-THR194` when the input CSV uses contact labels. |
 
 ## End-To-End Example
 
@@ -322,7 +318,7 @@ glink \
   -o out
 
 glink-cluster \
-  -r out/2ww4_glink_contacts.csv \
+  -f out/2ww4_glink_contacts.csv \
   -o clustered_glink \
   -g Human
 ```

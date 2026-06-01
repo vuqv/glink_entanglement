@@ -1,4 +1,5 @@
 import argparse
+import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass, replace
@@ -21,6 +22,9 @@ class Entanglement:
     chain: str
     i: int
     j: int
+    contact: str
+    contact_i_index: int
+    contact_j_index: int
     crossings: tuple
     gn: float
     gc: float
@@ -48,6 +52,20 @@ def parse_crossings(value) -> tuple:
 
 def contact_label(i: int, j: int) -> str:
     return f"{i}-{j}"
+
+
+def parse_contact(value: str) -> tuple[int, int]:
+    match = re.fullmatch(r"[A-Za-z]+(-?\d+)-[A-Za-z]+(-?\d+)", str(value).strip())
+    if not match:
+        raise ValueError(f"Invalid contact value: {value!r}")
+    return int(match.group(1)), int(match.group(2))
+
+
+def row_value(row, *names, default=None):
+    for name in names:
+        if hasattr(row, name):
+            return getattr(row, name)
+    return default
 
 
 def loops_overlap(ent1: Entanglement, ent2: Entanglement) -> bool:
@@ -80,8 +98,10 @@ def read_glink_csv(csv_file: str) -> list[Entanglement]:
     Gn/Gc. This clustering stage additionally requires at least one crossing
     residue, because representative entanglements are defined by crossing sets.
     """
-    data = pd.read_csv(csv_file, dtype={"chain": str, "crossings": str}, keep_default_na=False)
-    required_columns = {"chain", "resid_i", "resid_j", "gn", "gc", "Gn", "Gc", "crossings"}
+    data = pd.read_csv(csv_file, dtype={"chain": str, "contact": str, "crossings": str}, keep_default_na=False)
+    required_columns = {"gn", "gc", "Gn", "Gc", "crossings"}
+    if "contact" not in data.columns:
+        required_columns.update({"chain", "resid_i", "resid_j"})
     missing = required_columns.difference(data.columns)
     if missing:
         raise ValueError(f"Missing required columns in {csv_file}: {sorted(missing)}")
@@ -92,23 +112,35 @@ def read_glink_csv(csv_file: str) -> list[Entanglement]:
         if not crossings:
             continue
 
-        i = int(getattr(row, "resid_i"))
-        j = int(getattr(row, "resid_j"))
+        if "contact" in data.columns:
+            contact = getattr(row, "contact")
+            i, j = parse_contact(contact)
+        else:
+            i = int(getattr(row, "resid_i"))
+            j = int(getattr(row, "resid_j"))
+            contact = contact_label(i, j)
+        contact_i_index = int(row_value(row, "i", "contact_i_index", default=i))
+        contact_j_index = int(row_value(row, "j", "contact_j_index", default=j))
         if i > j:
             i, j = j, i
+            contact_i_index, contact_j_index = contact_j_index, contact_i_index
+            contact = contact_label(i, j)
 
         entanglements.append(
             Entanglement(
-                chain=str(getattr(row, "chain")),
+                chain=str(getattr(row, "chain", "SYSTEM") or "SYSTEM"),
                 i=i,
                 j=j,
+                contact=contact,
+                contact_i_index=contact_i_index,
+                contact_j_index=contact_j_index,
                 crossings=crossings,
                 gn=float(getattr(row, "gn")),
                 gc=float(getattr(row, "gc")),
                 Gn=int(getattr(row, "Gn")),
                 Gc=int(getattr(row, "Gc")),
                 num_contacts=1,
-                contacts=(contact_label(i, j),),
+                contacts=(contact,),
             )
         )
 
@@ -123,7 +155,7 @@ def select_minimal_loop_by_crossing_set(entanglements: list[Entanglement]) -> li
     representatives = []
     for group in grouped.values():
         rep = min(group, key=lambda ent: (ent.j - ent.i, ent.i, ent.j))
-        contacts = tuple(contact_label(ent.i, ent.j) for ent in group)
+        contacts = tuple(ent.contact for ent in group)
         representatives.append(
             replace(rep, num_contacts=len(group), contacts=contacts)
         )
@@ -277,9 +309,9 @@ def output_dataframe(entanglements: list[Entanglement]) -> pd.DataFrame:
         rows.append(
             {
                 "cluster_id": cluster_id,
-                "chain": ent.chain,
-                "resid_i": ent.i,
-                "resid_j": ent.j,
+                "contact": ent.contact,
+                "i": ent.contact_i_index,
+                "j": ent.contact_j_index,
                 "gn": round(ent.gn, 5),
                 "gc": round(ent.gc, 5),
                 "Gn": ent.Gn,
@@ -294,9 +326,9 @@ def output_dataframe(entanglements: list[Entanglement]) -> pd.DataFrame:
         rows,
         columns=[
             "cluster_id",
-            "chain",
-            "resid_i",
-            "resid_j",
+            "contact",
+            "i",
+            "j",
             "gn",
             "gc",
             "Gn",
@@ -326,7 +358,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Cluster representative entanglements from glink CSV output."
     )
-    parser.add_argument("-r", "--glink_csv", required=True, help="Raw entanglement CSV from glink.")
+    parser.add_argument("-f", "--glink_csv", required=True, help="Raw entanglement CSV from glink.")
     parser.add_argument("-o", "--outpath", required=True, help="Output directory.")
     parser.add_argument("-g", "--organism", choices=sorted(ORGANISM_CUTOFFS), help="Use organism-specific clustering cutoff.")
     parser.add_argument("-c", "--cutoff", type=float, help="Override spatial clustering cutoff.")

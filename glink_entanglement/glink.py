@@ -398,6 +398,21 @@ def main() -> None:
         topoly_min_dist=tuple(args.topoly_min_dist),
     )
     output_data = data.copy()
+    output_data.insert(
+        0,
+        "contact",
+        output_data["resname_i"]
+        + output_data["resid_i"].astype(str)
+        + "-"
+        + output_data["resname_j"]
+        + output_data["resid_j"].astype(str),
+    )
+    output_data = output_data.drop(
+        columns=["chain", "resid_i", "resname_i", "resid_j", "resname_j"]
+    )
+    output_data = output_data.rename(
+        columns={"contact_i_index": "i", "contact_j_index": "j"}
+    )
     for column in ("gn", "gc"):
         output_data[column] = output_data[column].map(lambda value: f"{value:.3f}")
     output_data.to_csv(output, index=False)

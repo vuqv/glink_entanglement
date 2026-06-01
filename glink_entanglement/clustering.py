@@ -26,13 +26,22 @@ class Entanglement:
     contact: str
     contact_i_index: int
     contact_j_index: int
-    crossings: tuple
+    crossings_n: tuple
+    crossings_c: tuple
     gn: float
     gc: float
     Gn: int
     Gc: int
     num_contacts: int
     contacts: tuple
+
+    @property
+    def crossings(self) -> tuple:
+        return (*self.crossings_n, *self.crossings_c)
+
+    @property
+    def side_crossings(self) -> tuple:
+        return (*(("N", crossing) for crossing in self.crossings_n), *(("C", crossing) for crossing in self.crossings_c))
 
 
 def crossing_number(crossing: str) -> int:
@@ -82,8 +91,12 @@ def entanglement_coord(ent: Entanglement) -> tuple:
     return (ent.i, ent.j, *[crossing_number(crossing) for crossing in ent.crossings])
 
 
-def same_chirality(ent1: Entanglement, ent2: Entanglement) -> bool:
-    return [cr[0] for cr in ent1.crossings] == [cr[0] for cr in ent2.crossings]
+def side_chirality(ent: Entanglement) -> tuple:
+    return tuple((side, crossing[0]) for side, crossing in ent.side_crossings)
+
+
+def same_side_chirality(ent1: Entanglement, ent2: Entanglement) -> bool:
+    return side_chirality(ent1) == side_chirality(ent2)
 
 
 def merge_into_representative(rep: Entanglement, merged: Entanglement) -> Entanglement:
@@ -93,14 +106,19 @@ def merge_into_representative(rep: Entanglement, merged: Entanglement) -> Entang
 
 def read_glink_csv(csv_file: str) -> list[Entanglement]:
     """
-    Read glink.py output and return rows with Topoly crossings.
+    Read glink.py output and keep N-side and C-side crossings separate.
 
-    The standalone GLN calculator already filters contacts to nonzero rounded
-    Gn/Gc. This clustering stage additionally requires at least one crossing
-    residue, because representative entanglements are defined by crossing sets.
+    The raw CSV must contain `crossingsN` and `crossingsC`. The combined
+    `crossings` column is retained for output compatibility but is not used for
+    clustering, because the same residue on the N-terminal side and C-terminal
+    side represents different entanglement signatures.
     """
-    data = pd.read_csv(csv_file, dtype={"chain": str, "contact": str, "crossings": str}, keep_default_na=False)
-    required_columns = {"gn", "gc", "Gn", "Gc", "crossings"}
+    data = pd.read_csv(
+        csv_file,
+        dtype={"chain": str, "contact": str, "crossingsN": str, "crossingsC": str, "crossings": str},
+        keep_default_na=False,
+    )
+    required_columns = {"gn", "gc", "Gn", "Gc", "crossingsN", "crossingsC"}
     if "contact" not in data.columns:
         required_columns.update({"chain", "resid_i", "resid_j"})
     missing = required_columns.difference(data.columns)
@@ -109,8 +127,9 @@ def read_glink_csv(csv_file: str) -> list[Entanglement]:
 
     entanglements = []
     for row in data.itertuples(index=False):
-        crossings = parse_crossings(getattr(row, "crossings"))
-        if not crossings:
+        crossings_n = parse_crossings(getattr(row, "crossingsN"))
+        crossings_c = parse_crossings(getattr(row, "crossingsC"))
+        if not crossings_n and not crossings_c:
             continue
 
         if "contact" in data.columns:
@@ -135,7 +154,8 @@ def read_glink_csv(csv_file: str) -> list[Entanglement]:
                 contact=contact,
                 contact_i_index=contact_i_index,
                 contact_j_index=contact_j_index,
-                crossings=crossings,
+                crossings_n=crossings_n,
+                crossings_c=crossings_c,
                 gn=float(getattr(row, "gn")),
                 gc=float(getattr(row, "gc")),
                 Gn=int(getattr(row, "Gn")),
@@ -151,25 +171,19 @@ def read_glink_csv(csv_file: str) -> list[Entanglement]:
 def select_minimal_loop_by_crossing_set(entanglements: list[Entanglement]) -> list[Entanglement]:
     grouped = defaultdict(list)
     for ent in entanglements:
-        grouped[(ent.chain, ent.crossings)].append(ent)
+        grouped[(ent.chain, ent.side_crossings)].append(ent)
 
     representatives = []
     for group in grouped.values():
         rep = min(group, key=lambda ent: (ent.j - ent.i, ent.i, ent.j))
         contacts = tuple(ent.contact for ent in group)
-        representatives.append(
-            replace(rep, num_contacts=len(group), contacts=contacts)
-        )
+        representatives.append(replace(rep, num_contacts=len(group), contacts=contacts))
 
     return representatives
 
 
 def merge_larger_overlapping_loops(entanglements: list[Entanglement]) -> list[Entanglement]:
-    """
-    Merge same-size, same-chirality crossing sets by keeping the smaller loop.
-
-    This mirrors Step 3 in clustering.py.
-    """
+    """Merge nearby same-side, same-chirality crossing sets by keeping the smaller loop."""
     active = list(entanglements)
     changed = True
 
@@ -186,7 +200,7 @@ def merge_larger_overlapping_loops(entanglements: list[Entanglement]) -> list[En
                     continue
                 if len(ent_a.crossings) != len(ent_b.crossings):
                     continue
-                if not same_chirality(ent_a, ent_b):
+                if not same_side_chirality(ent_a, ent_b):
                     continue
                 if not loops_overlap(ent_a, ent_b):
                     continue
@@ -237,10 +251,7 @@ def representative_for_cluster(cluster: list[Entanglement]) -> Entanglement:
 def spatially_cluster_entanglements(entanglements: list[Entanglement], cutoff: float) -> list[Entanglement]:
     grouped = defaultdict(list)
     for ent in entanglements:
-        chirality = tuple(crossing[0] for crossing in ent.crossings)
-        # Keep single-crossing, double-crossing, etc. entanglements in separate
-        # clustering classes so representatives never mix crossing counts.
-        grouped[(ent.chain, len(ent.crossings), chirality)].append(ent)
+        grouped[(ent.chain, len(ent.crossings), side_chirality(ent))].append(ent)
 
     representatives = []
     for group in grouped.values():
@@ -281,10 +292,11 @@ def cluster_glink(csv_file: str, cutoff: float) -> pd.DataFrame:
     """
     Cluster glink.py output into representative entanglements.
 
-    The input CSV must contain the standalone GLN columns, especially `chain`,
-    `resid_i`, `resid_j`, `gn`, `gc`, `Gn`, `Gc`, and `crossings`. Clustering is
-    performed separately for each crossing count, so contacts with one crossing
-    cannot be merged into representatives with two crossings, and so on.
+    N-terminal and C-terminal crossings are treated as distinct. A contact with
+    `crossingsN` can cluster only with contacts that have the same N-side
+    crossing pattern; a contact with `crossingsC` can cluster only with the same
+    C-side pattern. The output includes `crossingsN`, `crossingsC`, and combined
+    `crossings` columns.
     """
     raw_entanglements = read_glink_csv(csv_file)
     if not raw_entanglements:
@@ -305,8 +317,10 @@ def cluster_glink(csv_file: str, cutoff: float) -> pd.DataFrame:
 def output_dataframe(entanglements: list[Entanglement]) -> pd.DataFrame:
     rows = []
     for cluster_id, ent in enumerate(
-        sorted(entanglements, key=lambda item: (item.chain, item.i, item.j, item.crossings))
+        sorted(entanglements, key=lambda item: (item.chain, item.i, item.j, item.side_crossings))
     ):
+        crossings_n = " ".join(ent.crossings_n)
+        crossings_c = " ".join(ent.crossings_c)
         rows.append(
             {
                 "cluster_id": cluster_id,
@@ -317,7 +331,9 @@ def output_dataframe(entanglements: list[Entanglement]) -> pd.DataFrame:
                 "gc": round(ent.gc, 5),
                 "Gn": ent.Gn,
                 "Gc": ent.Gc,
-                "crossings": " ".join(ent.crossings),
+                "crossingsN": crossings_n,
+                "crossingsC": crossings_c,
+                "crossings": " ".join(value for value in (crossings_n, crossings_c) if value),
                 "num_contacts": ent.num_contacts,
                 "contacts": ";".join(ent.contacts),
             }
@@ -334,6 +350,8 @@ def output_dataframe(entanglements: list[Entanglement]) -> pd.DataFrame:
             "gc",
             "Gn",
             "Gc",
+            "crossingsN",
+            "crossingsC",
             "crossings",
             "num_contacts",
             "contacts",
@@ -351,8 +369,16 @@ def resolve_cutoff(organism: str | None, cutoff: float | None) -> float:
     return ORGANISM_CUTOFFS[organism]
 
 
-def default_output_path(csv_file: str, outpath: str) -> Path:
-    return Path(outpath) / f"{Path(csv_file).stem}_clustered.csv"
+def resolve_output_path(csv_file: str, output: str) -> Path:
+    default_name = f"{Path(csv_file).stem}_clustered.csv"
+    output_path = Path(output)
+
+    if output_path.suffix.lower() == ".csv":
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        return output_path
+
+    output_path.mkdir(parents=True, exist_ok=True)
+    return output_path / default_name
 
 
 def main() -> None:
@@ -361,7 +387,7 @@ def main() -> None:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("-f", "--glink_csv", required=True, help="Required. Raw entanglement CSV from glink.")
-    parser.add_argument("-o", "--outpath", required=True, help="Required. Output directory.")
+    parser.add_argument("-o", "--output_path", "--outpath", required=True, help="Required. Output directory or CSV path.")
     parser.add_argument(
         "-g",
         "--organism",
@@ -370,13 +396,11 @@ def main() -> None:
         help="Optional. Use an organism-specific clustering cutoff. Custom uses cutoff 52.",
     )
     parser.add_argument("-c", "--cutoff", type=float, help="Optional. Override spatial clustering cutoff.")
-    parser.add_argument("-w", "--output", help="Optional. Full output CSV path. Overrides --outpath default naming.")
+    parser.add_argument("-w", "--output", help="Optional. Legacy explicit output CSV path. Overrides -o/--output_path.")
     args = parser.parse_args()
 
-    outpath = Path(args.outpath)
-    outpath.mkdir(parents=True, exist_ok=True)
     cutoff = resolve_cutoff(args.organism, args.cutoff)
-    output = Path(args.output) if args.output else default_output_path(args.glink_csv, args.outpath)
+    output = resolve_output_path(args.glink_csv, args.output or args.output_path)
 
     start = time.perf_counter()
     clustered = cluster_glink(args.glink_csv, cutoff)

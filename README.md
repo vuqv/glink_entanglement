@@ -12,7 +12,7 @@ Recommended package naming:
 Current command-line scripts:
 
 - `glink`: calculate GLN values, call Topoly, and write raw entangled contacts as CSV.
-- `glink-cluster`: cluster the raw CSV into representative entanglements.
+- `glink-cluster`: cluster the raw CSV into representative entanglements while treating `crossingsN` and `crossingsC` as different crossing sets.
 
 Source-tree compatibility wrappers are also provided:
 
@@ -226,13 +226,15 @@ The script performs these stages:
 (resid_i, resid_j, crossing_residue_ids...)
 ```
 
+Clustering keeps N-terminal and C-terminal Topoly crossings separate. For example, `crossingsN = +45` and `crossingsC = +45` are treated as different crossing signatures and cannot be merged into the same representative just because the residue number is the same.
+
 Clustering is separated by:
 
 ```text
-(chain, number_of_crossings, chirality_sequence)
+(chain, number_of_crossings, side_and_chirality_sequence)
 ```
 
-This means one-crossing representatives are not merged into two-crossing representatives, and so on.
+This means one-crossing representatives are not merged into two-crossing representatives, and N-side crossings are not merged with C-side crossings.
 
 ### Organism Cutoffs
 
@@ -280,9 +282,8 @@ Writing to an explicit output file:
 ```bash
 glink-cluster \
   -f 2ww4_glink_contacts.csv \
-  -o clustered_glink \
-  -g Human \
-  -w clustered_glink/2ww4_representative_entanglements.csv
+  -o clustered_glink/2ww4_representative_entanglements.csv \
+  -g Human
 ```
 
 ### Arguments
@@ -290,17 +291,18 @@ glink-cluster \
 | Short | Long | Description |
 | --- | --- | --- |
 | `-f` | `--glink_csv` | Required. Raw entanglement CSV from `glink`. |
-| `-o` | `--outpath` | Required. Output directory. |
+| `-o` | `--output_path`, `--outpath` | Required. Output directory or CSV path. If a directory is provided, writes `<input_csv_stem>_clustered.csv` inside it. If a `.csv` path is provided, writes exactly to that file. |
 | `-g` | `--organism` | Optional organism preset: `Custom`, `Human`, `Ecoli`, or `Yeast`. Default: `Custom`. |
 | `-c` | `--cutoff` | Optional custom spatial clustering cutoff. Overrides organism preset. |
-| `-w` | `--output` | Optional full output CSV path. Default: `<input_csv_stem>_clustered.csv` inside `--outpath`. |
+| `-w` | `--output` | Optional legacy explicit output CSV path. Overrides `-o/--output_path`. |
 
 ### Output
 
-Default output name:
+Default output behavior:
 
 ```text
-<input_csv_stem>_clustered.csv
+-o clustered_glink      -> clustered_glink/<input_csv_stem>_clustered.csv
+-o clustered/file.csv   -> clustered/file.csv
 ```
 
 CSV columns:
@@ -315,7 +317,9 @@ CSV columns:
 | `gc` | `gc` value from the representative contact, printed to three decimals. |
 | `Gn` | Rounded absolute `gn` from the representative contact. |
 | `Gc` | Rounded absolute `gc` from the representative contact. |
-| `crossings` | Representative crossing residue set. |
+| `crossingsN` | Representative N-terminal crossing residue set. |
+| `crossingsC` | Representative C-terminal crossing residue set. |
+| `crossings` | Combined `crossingsN` and `crossingsC`, retained for readability and compatibility. |
 | `num_contacts` | Number of raw contacts represented by the cluster. |
 | `contacts` | Semicolon-delimited raw contact list, formatted like `ILE17-THR194` when the input CSV uses contact labels. |
 

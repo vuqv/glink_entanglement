@@ -240,13 +240,22 @@ Preset cutoffs:
 
 | Organism | Cutoff |
 | --- | --- |
+| `Custom` | `52` |
 | `Human` | `52` |
 | `Ecoli` | `57` |
 | `Yeast` | `49` |
 
-You can also provide a custom cutoff with `--cutoff`.
+`Custom` is the default when `-g/--organism` is not specified. You can also provide a custom cutoff with `--cutoff`; this overrides the organism preset.
 
 ### Command
+
+Using the default `Custom` cutoff of 52:
+
+```bash
+glink-cluster \
+  -f 2ww4_glink_contacts.csv \
+  -o clustered_glink
+```
 
 Using an organism preset:
 
@@ -257,7 +266,7 @@ glink-cluster \
   -g Human
 ```
 
-Using a custom cutoff:
+Using an explicit custom cutoff:
 
 ```bash
 glink-cluster \
@@ -280,11 +289,11 @@ glink-cluster \
 
 | Short | Long | Description |
 | --- | --- | --- |
-| `-f` | `--glink_csv` | Raw entanglement CSV from `glink`. |
-| `-o` | `--outpath` | Output directory. |
-| `-g` | `--organism` | Organism preset: `Human`, `Ecoli`, or `Yeast`. |
-| `-c` | `--cutoff` | Custom spatial clustering cutoff. |
-| `-w` | `--output` | Full output CSV path. |
+| `-f` | `--glink_csv` | Required. Raw entanglement CSV from `glink`. |
+| `-o` | `--outpath` | Required. Output directory. |
+| `-g` | `--organism` | Optional organism preset: `Custom`, `Human`, `Ecoli`, or `Yeast`. Default: `Custom`. |
+| `-c` | `--cutoff` | Optional custom spatial clustering cutoff. Overrides organism preset. |
+| `-w` | `--output` | Optional full output CSV path. Default: `<input_csv_stem>_clustered.csv` inside `--outpath`. |
 
 ### Output
 

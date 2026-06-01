@@ -351,31 +351,32 @@ def resolve_output_path(pdb_file: str, output: str | None) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Calculate per-contact Gaussian linking values from an all-atom PDB."
+        description="Calculate per-contact Gaussian linking values from an all-atom PDB.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("-f", "--PDB", required=True, help="Input all-atom PDB file.")
+    parser.add_argument("-f", "--PDB", required=True, help="Required. Input all-atom PDB file.")
     parser.add_argument(
         "-o",
         "--output",
-        help="Output directory or CSV path. Directory writes <pdb>_glink_contacts.csv inside it.",
+        help="Optional. Output directory or CSV path. Directory writes <pdb>_glink_contacts.csv inside it.",
     )
     parser.add_argument(
         "--GLN_threshold",
         type=float,
         default=0.6,
-        help="Threshold used to round absolute gn/gc values into Gn/Gc. Default: 0.6.",
+        help="Optional. Threshold used to round absolute gn/gc values into Gn/Gc.",
     )
     parser.add_argument(
         "--contact_cutoff",
         type=float,
         default=4.5,
-        help="Heavy-atom distance cutoff in Angstrom for residue contacts. Default: 4.5.",
+        help="Optional. Heavy-atom distance cutoff in Angstrom for residue contacts.",
     )
     parser.add_argument(
         "--topoly_density",
         type=int,
         default=0,
-        help="Topoly minimal-surface triangulation density. Default: 0 for speed; use 1 for Topoly's default precision.",
+        help="Optional. Topoly minimal-surface triangulation density. Use 1 for Topoly's default precision.",
     )
     parser.add_argument(
         "--topoly_min_dist",
@@ -383,7 +384,7 @@ def main() -> None:
         nargs=3,
         default=(10, 6, 5),
         metavar=("CROSSING", "LOOP", "TAIL_END"),
-        help="Topoly crossing-reduction distances. Default: 10 6 5.",
+        help="Optional. Topoly crossing-reduction distances.",
     )
     args = parser.parse_args()
 

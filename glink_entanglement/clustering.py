@@ -11,6 +11,7 @@ from scipy.spatial import cKDTree
 
 
 ORGANISM_CUTOFFS = {
+    "Custom": 52,
     "Human": 52,
     "Ecoli": 57,
     "Yeast": 49,
@@ -344,9 +345,9 @@ def resolve_cutoff(organism: str | None, cutoff: float | None) -> float:
     if cutoff is not None:
         return cutoff
     if organism is None:
-        raise ValueError("Specify either --organism or --cutoff")
+        organism = "Custom"
     if organism not in ORGANISM_CUTOFFS:
-        raise ValueError("Must specify Human, Yeast, or Ecoli")
+        raise ValueError("Must specify Custom, Human, Yeast, or Ecoli")
     return ORGANISM_CUTOFFS[organism]
 
 
@@ -356,13 +357,20 @@ def default_output_path(csv_file: str, outpath: str) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Cluster representative entanglements from glink CSV output."
+        description="Cluster representative entanglements from glink CSV output.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("-f", "--glink_csv", required=True, help="Raw entanglement CSV from glink.")
-    parser.add_argument("-o", "--outpath", required=True, help="Output directory.")
-    parser.add_argument("-g", "--organism", choices=sorted(ORGANISM_CUTOFFS), help="Use organism-specific clustering cutoff.")
-    parser.add_argument("-c", "--cutoff", type=float, help="Override spatial clustering cutoff.")
-    parser.add_argument("-w", "--output", help="Full output CSV path. Overrides --outpath default naming.")
+    parser.add_argument("-f", "--glink_csv", required=True, help="Required. Raw entanglement CSV from glink.")
+    parser.add_argument("-o", "--outpath", required=True, help="Required. Output directory.")
+    parser.add_argument(
+        "-g",
+        "--organism",
+        choices=sorted(ORGANISM_CUTOFFS),
+        default="Custom",
+        help="Optional. Use an organism-specific clustering cutoff. Custom uses cutoff 52.",
+    )
+    parser.add_argument("-c", "--cutoff", type=float, help="Optional. Override spatial clustering cutoff.")
+    parser.add_argument("-w", "--output", help="Optional. Full output CSV path. Overrides --outpath default naming.")
     args = parser.parse_args()
 
     outpath = Path(args.outpath)

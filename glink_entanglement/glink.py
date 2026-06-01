@@ -2,6 +2,7 @@ import argparse
 import os
 import tempfile
 import time
+import warnings
 from pathlib import Path
 
 os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "matplotlib"))
@@ -295,7 +296,14 @@ def calculate_pdb_glink(
     Topoly crossing residue, with residue IDs, residue names, zero-based contact
     indices, raw `gn`/`gc`, rounded `Gn`/`Gc`, and Topoly crossing residues.
     """
-    universe = mda.Universe(pdb_file, format="PDB")
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"1 A\^3 CRYST1 record.*",
+            category=UserWarning,
+            module=r"MDAnalysis\.coordinates\.PDB",
+        )
+        universe = mda.Universe(pdb_file, format="PDB")
     heavy_atoms = universe.select_atoms("protein and not name H*")
     all_results = []
 

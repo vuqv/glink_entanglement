@@ -340,7 +340,10 @@ def main() -> None:
 
     start = time.perf_counter()
     clustered = cluster_glink(args.glink_csv, cutoff)
-    clustered.to_csv(output, index=False)
+    output_data = clustered.copy()
+    for column in ("gn", "gc"):
+        output_data[column] = output_data[column].map(lambda value: f"{value:.3f}")
+    output_data.to_csv(output, index=False)
     elapsed = time.perf_counter() - start
 
     print(f"Wrote {len(clustered)} representative entanglements to {output}")

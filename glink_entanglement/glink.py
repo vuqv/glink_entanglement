@@ -397,7 +397,10 @@ def main() -> None:
         topoly_density=args.topoly_density,
         topoly_min_dist=tuple(args.topoly_min_dist),
     )
-    data.to_csv(output, index=False)
+    output_data = data.copy()
+    for column in ("gn", "gc"):
+        output_data[column] = output_data[column].map(lambda value: f"{value:.3f}")
+    output_data.to_csv(output, index=False)
     elapsed = time.perf_counter() - total_start
 
     print(f"Wrote {len(data)} contacts to {output}")
